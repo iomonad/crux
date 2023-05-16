@@ -38,11 +38,11 @@
        (< (.getSeconds (Duration/between (.toInstant checkpoint-at) (Instant/now)))
           (/ (.getSeconds approx-frequency) 2))))
 
-(defn checkpoint [{:keys [dir bus src store ::cp-format approx-frequency]}]
+(defn checkpoint [{:keys [dir bus src store ::cp-format approx-frequency bootstrap-mode]}]
   (when-not (recent-cp? (first (available-checkpoints store {::cp-format cp-format})) approx-frequency)
     (bus/send bus (bus/->event :healthz :begin-checkpoint))
     (when-let [{:keys [tx]} (save-checkpoint src dir)]
-      (when tx
+      (when (and tx (not bootstrap-mode))
         (let [cp-at (java.util.Date.)
               opts {:tx tx :cp-at cp-at ::cp-format cp-format}]
           (try
@@ -120,6 +120,9 @@
                                                                   :default true}
                                   :keep-dir-on-close? {:spec ::sys/boolean
                                                        :required? true
+                                                       :default false}
+                                  :bootstrap-mode     {:spec ::sys/boolean
+                                                       :required false
                                                        :default false}
                                   :approx-frequency {:spec ::sys/duration
                                                      :required? true}}}
